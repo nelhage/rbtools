@@ -12,6 +12,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+import httplib
 import urllib
 import urllib2
 from optparse import OptionParser
@@ -262,6 +263,20 @@ class ReviewBoardHTTPPasswordMgr(urllib2.HTTPPasswordMgr):
             # handlers are global), fall back to standard password management.
             return urllib2.HTTPPasswordMgr.find_user_password(self, realm, uri)
 
+class ReviewBoardHTTPSClientAuthHandler(urllib2.HTTPSHandler):
+    def __init__(self):
+        urllib2.HTTPSHandler.__init__(self)
+
+    def https_open(self, req):
+     #Rather than pass in a reference to a connection class, we pass in
+     # a reference to a function which, for all intents and purposes,
+     # will behave as a constructor
+        return self.do_open(self.getConnection, req)
+
+    def getConnection(self, host, timeout=300):
+        return httplib.HTTPSConnection(host,
+                                       key_file=options.ssl_key_file,
+                                       cert_file=options.ssl_cert_file)
 
 class ReviewBoardServer(object):
     """
@@ -280,8 +295,9 @@ class ReviewBoardServer(object):
         cookie_handler = urllib2.HTTPCookieProcessor(self.cookie_jar)
         password_mgr   = ReviewBoardHTTPPasswordMgr(self.url)
         auth_handler   = urllib2.HTTPBasicAuthHandler(password_mgr)
+        ssl_opener     = ReviewBoardHTTPSClientAuthHandler()
 
-        opener = urllib2.build_opener(cookie_handler, auth_handler)
+        opener = urllib2.build_opener(cookie_handler, ssl_opener, auth_handler)
         opener.addheaders = [('User-agent', 'post-review/' + VERSION)]
         urllib2.install_opener(opener)
 
@@ -2406,6 +2422,12 @@ def parse_options(args):
     parser.add_option("--password",
                       dest="password", default=None, metavar="PASSWORD",
                       help="password to be supplied to the reviewboard server")
+    parser.add_option("--ssl-cert-file",
+                      dest="ssl_cert_file", default=None, metavar="FILE",
+                      help="SSL Certiticate to present to the reviewboard server")
+    parser.add_option("--ssl-key-file",
+                      dest="ssl_key_file", default=None, metavar="FILE",
+                      help="SSL private key to present to the reviewboard server")
     parser.add_option("--change-only",
                       dest="change_only", action="store_true",
                       default=False,
