@@ -1971,14 +1971,16 @@ class GitClient(SCMClient):
         # TODO
 
         # Nope, it's git then.
-        origin = execute(["git", "remote", "show", "origin"])
-        m = re.search(r'URL: (.+)', origin)
-        if m:
-            url = m.group(1).rstrip('/')
-            if url:
-                self.type = "git"
-                return RepositoryInfo(path=url, base_path='',
-                                      supports_parent_diffs=True)
+        url = execute(["git", "config", "reviewboard.path"], ignore_errors=True).strip()
+        if not url:
+            origin = execute(["git", "remote", "show", "origin"])
+            m = re.search(r'URL: (.+)', origin)
+            if m:
+                url = m.group(1).rstrip('/')
+        if url:
+            self.type = "git"
+            return RepositoryInfo(path=url, base_path='',
+                                  supports_parent_diffs=True)
 
         return None
 
